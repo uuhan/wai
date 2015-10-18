@@ -1,23 +1,17 @@
-name:            yesod-core
-version:         1.4.16
+name:            wai-frontend-monad
+version:         0.1.0.0
 license:         MIT
 license-file:    LICENSE
 author:          Michael Snoyman <michael@snoyman.com>
 maintainer:      Michael Snoyman <michael@snoyman.com>
-synopsis:        Creation of type-safe, RESTful web applications.
-description:     API docs and the README are available at <http://www.stackage.org/package/yesod-core>
-category:        Web, Yesod
+synopsis:        Monadic interface for writing WAI route handlers
+description:     Please see README.md
+category:        Web
 stability:       Stable
 cabal-version:   >= 1.8
 build-type:      Simple
-homepage:        http://www.yesodweb.com/
+homepage:        http://github.com/yesodweb/wai
 extra-source-files:
-  test.hs
-  test/YesodCoreTest.hs
-  test/YesodCoreTest/*.hs
-  test/YesodCoreTest/JsLoaderSites/Bottom.hs
-  test/en.msg
-  test/test.hs
   ChangeLog.md
   README.md
 
@@ -105,81 +99,7 @@ library
                      Yesod.Routes.TH.RouteAttrs
 
     ghc-options:     -Wall
-    -- Following line added due to: https://github.com/yesodweb/yesod/issues/545
-    -- This looks like a GHC bug
-    extensions:      MultiParamTypeClasses
-
-    -- Workaround for: http://ghc.haskell.org/trac/ghc/ticket/8443
-    extensions:      TemplateHaskell
-
-test-suite test-routes
-    type: exitcode-stdio-1.0
-    main-is: RouteSpec.hs
-    hs-source-dirs: test, .
-
-    other-modules: Hierarchy
-
-    -- Workaround for: http://ghc.haskell.org/trac/ghc/ticket/8443
-    extensions:      TemplateHaskell
-
-    build-depends: base
-                 , hspec
-                 , containers
-                 , bytestring
-                 , template-haskell
-                 , text
-                 , random
-                 , path-pieces
-                 , HUnit
-
-test-suite tests
-    type: exitcode-stdio-1.0
-    main-is: test.hs
-    hs-source-dirs: test
-
-    cpp-options:   -DTEST
-    build-depends: base
-                  ,hspec >= 1.3
-                  ,hspec-expectations
-                  ,clientsession
-                  ,wai >= 3.0
-                  ,yesod-core
-                  ,bytestring
-                  ,text
-                  ,http-types
-                  , random
-                  , blaze-builder
-                  ,HUnit
-                  ,QuickCheck >= 2 && < 3
-                  ,transformers
-                  , conduit
-                  , containers
-                  , lifted-base
-                  , resourcet
-                  , network
-                  , async
-                  , conduit-extra
-                  , shakespeare
-                  , streaming-commons
-                  , wai-extra
-                  , mwc-random
-                  , cookie >= 0.4.1    && < 0.5
-    ghc-options:     -Wall
-    extensions: TemplateHaskell
-
-benchmark widgets
-    type: exitcode-stdio-1.0
-    hs-source-dirs: bench
-    build-depends:  base
-                  , criterion
-                  , bytestring
-                  , text
-                  , transformers
-                  , yesod-core
-                  , blaze-html
-    main-is:        widget.hs
-    ghc-options:    -Wall -O2
 
 source-repository head
   type:     git
-  location: https://github.com/yesodweb/yesod
+  location: https://github.com/yesodweb/wai
