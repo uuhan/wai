@@ -20,83 +20,14 @@ library
                    , time                  >= 1.1.4
                    , wai                   >= 3.0
                    , wai-extra             >= 3.0.7
-                   , bytestring            >= 0.9.1.4
+                   , bytestring            >= 0.10
                    , text                  >= 0.7
-                   , template-haskell
-                   , path-pieces           >= 0.1.2    && < 0.3
-                   , shakespeare           >= 2.0
-                   , blaze-builder         >= 0.2.1.4  && < 0.5
                    , transformers          >= 0.2.2
                    , mtl
-                   , clientsession         >= 0.9.1    && < 0.10
-                   , random                >= 1.0.0.2  && < 1.2
-                   , cereal                >= 0.3
-                   , old-locale            >= 1.0.0.2  && < 1.1
-                   , containers            >= 0.2
-                   , unordered-containers  >= 0.2
-                   , monad-control         >= 0.3      && < 1.1
-                   , transformers-base     >= 0.4
-                   , cookie                >= 0.4.1    && < 0.5
-                   , http-types            >= 0.7
-                   , case-insensitive      >= 0.2
-                   , parsec                >= 2        && < 3.2
-                   , directory             >= 1
-                   , vector                >= 0.9      && < 0.12
-                   , aeson                 >= 0.5
-                   , fast-logger           >= 2.2
-                   , wai-logger            >= 0.2
-                   , monad-logger          >= 0.3.1    && < 0.4
-                   , conduit               >= 1.2
-                   , resourcet             >= 0.4.9    && < 1.2
-                   , lifted-base           >= 0.1.2
-                   , blaze-html            >= 0.5
-                   , blaze-markup          >= 0.5.1
-                   , data-default
-                   , safe
-                   , warp                  >= 3.0.2
-                   , unix-compat
-                   , conduit-extra
-                   , exceptions            >= 0.6
-                   , deepseq
-                   , mwc-random
-                   , primitive
-                   , word8
-                   , auto-update
-                   , semigroups
-                   , byteable
+                   , lens-family
 
-    exposed-modules: Yesod.Core
-                     Yesod.Core.Content
-                     Yesod.Core.Dispatch
-                     Yesod.Core.Handler
-                     Yesod.Core.Json
-                     Yesod.Core.Widget
-                     Yesod.Core.Internal
-                     Yesod.Core.Types
-                     Yesod.Core.Unsafe
-                     Yesod.Routes.TH.Types
-    other-modules:   Yesod.Core.Internal.Session
-                     Yesod.Core.Internal.Request
-                     Yesod.Core.Class.Handler
-                     Yesod.Core.Internal.Util
-                     Yesod.Core.Internal.Response
-                     Yesod.Core.Internal.Run
-                     Yesod.Core.Internal.TH
-                     Yesod.Core.Internal.LiteApp
-                     Yesod.Core.Class.Yesod
-                     Yesod.Core.Class.Dispatch
-                     Yesod.Core.Class.Breadcrumbs
-                     Yesod.Core.TypeCache
-                     Paths_yesod_core
-
-                     Yesod.Routes.TH
-                     Yesod.Routes.Class
-                     Yesod.Routes.Parse
-                     Yesod.Routes.Overlap
-                     Yesod.Routes.TH.Dispatch
-                     Yesod.Routes.TH.RenderRoute
-                     Yesod.Routes.TH.ParseRoute
-                     Yesod.Routes.TH.RouteAttrs
+    exposed-modules: Network.Wai.Frontend.Monad.Internal
+    other-modules:   Paths_wai_frontend_monad
 
     ghc-options:     -Wall
 

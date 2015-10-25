@@ -1,74 +1,60 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE UndecidableInstances #-}
-module Yesod.Core.Types where
+{-# LANGUAGE TemplateHaskell #-}
+module Network.Wai.Frontend.Monad.Internal where
 
-import qualified Blaze.ByteString.Builder           as BBuilder
-import qualified Blaze.ByteString.Builder.Char.Utf8
-#if __GLASGOW_HASKELL__ < 710
-import           Control.Applicative                (Applicative (..))
-import           Control.Applicative                ((<$>))
-import           Data.Monoid                        (Monoid (..))
-#endif
-import           Control.Arrow                      (first)
-import           Control.Exception                  (Exception)
-import           Control.Monad                      (liftM, ap)
-import           Control.Monad.Base                 (MonadBase (liftBase))
-import           Control.Monad.Catch                (MonadCatch (..))
-import           Control.Monad.Catch                (MonadMask (..))
-import           Control.Monad.IO.Class             (MonadIO (liftIO))
-import           Control.Monad.Logger               (LogLevel, LogSource,
-                                                     MonadLogger (..))
-import           Control.Monad.Trans.Control        (MonadBaseControl (..))
-import           Control.Monad.Trans.Resource       (MonadResource (..), InternalState, runInternalState, MonadThrow (..), monadThrow, ResourceT)
-import           Data.ByteString                    (ByteString)
-import qualified Data.ByteString.Lazy               as L
-import           Data.Conduit                       (Flush, Source)
-import           Data.IORef                         (IORef)
-import           Data.Map                           (Map, unionWith)
-import qualified Data.Map                           as Map
-import           Data.Monoid                        (Endo (..), Last (..))
-import           Data.Serialize                     (Serialize (..),
-                                                     putByteString)
-import           Data.String                        (IsString (fromString))
-import           Data.Text                          (Text)
-import qualified Data.Text                          as T
-import qualified Data.Text.Lazy.Builder             as TBuilder
-import           Data.Time                          (UTCTime)
-import           Data.Typeable                      (Typeable)
-import           Language.Haskell.TH.Syntax         (Loc)
-import qualified Network.HTTP.Types                 as H
-import           Network.Wai                        (FilePart,
-                                                     RequestBodyLength)
-import qualified Network.Wai                        as W
-import qualified Network.Wai.Parse                  as NWP
-import           System.Log.FastLogger              (LogStr, LoggerSet, toLogStr, pushLogStr)
-import qualified System.Random.MWC                  as MWC
-import           Network.Wai.Logger                 (DateCacheGetter)
-import           Text.Blaze.Html                    (Html, toHtml)
-import           Text.Hamlet                        (HtmlUrl)
-import           Text.Julius                        (JavascriptUrl)
-import           Web.Cookie                         (SetCookie)
-import           Yesod.Core.Internal.Util           (getTime, putTime)
-import           Control.Monad.Trans.Class          (MonadTrans (..))
-import           Yesod.Routes.Class                 (RenderRoute (..), ParseRoute (..))
-import           Control.Monad.Reader               (MonadReader (..))
-#if !MIN_VERSION_base(4, 6, 0)
-import Prelude hiding (catch)
-#endif
-import Control.DeepSeq (NFData (rnf))
-import Data.Conduit.Lazy (MonadActive, monadActive)
-import Yesod.Core.TypeCache (TypeMap, KeyedTypeMap)
-#if MIN_VERSION_monad_logger(0, 3, 10)
-import Control.Monad.Logger (MonadLoggerIO (..))
-#endif
-import Data.Semigroup (Semigroup)
+import Lens.Family2
+import Lens.Family2.TH
+import Network.Wai
 
+-- |
+--
+-- @since 0.1.0.0
+class HasWaiRequest a where
+    waiRequest :: Lens' a Request
+instance HasWaiRequest Request where
+    waiRequest = id
+
+-- | A rich request value, containing additional parsed information relative to
+-- the plain WAI Request value.
+--
+-- @since 0.1.0.0
+data RichRequest = RichRequest
+    { rrWaiRequest :: Request
+    -- ^
+    --
+    -- @since 0.1.0.0
+    , rrGetParams  :: [(Text, Text)]
+    -- ^
+    --
+    -- @since 0.1.0.0
+    , rrCookies    :: [(Text, Text)]
+    -- ^
+    --
+    -- @since 0.1.0.0
+    , reqLangs      :: [Text]
+    -- ^
+    --
+    -- @since 0.1.0.0
+    {- FIXME include here?
+    , reqToken      :: !(Maybe Text)
+      -- ^ A random, session-specific token used to prevent CSRF attacks.
+    , reqSession    :: !SessionMap
+      -- ^ Initial session sent from the client.
+      --
+      -- Since 1.2.0
+    -}
+    , reqAccept     :: ![ContentType]
+      -- ^ An ordered list of the accepted content types.
+      --
+      -- Since 1.2.0
+    }
+class HasWaiRequest a => HasRichRequest a where
+    richRequest :: Lens' a RichRequest
+instance HasWaiRequest RichRequest where
+    waiRequest = lens rrWaiRequest (\rr req -> rr { rrWaiRequest = req })
+instance HasRichRequest RichRequest where
+    richRequest = id
+
+{-
 -- Sessions
 type SessionMap = Map Text ByteString
 
@@ -103,24 +89,6 @@ data ClientSessionDateCache =
 
 -- | The parsed request information. This type augments the standard WAI
 -- 'W.Request' with additional information.
-data YesodRequest = YesodRequest
-    { reqGetParams  :: ![(Text, Text)]
-      -- ^ Same as 'W.queryString', but decoded to @Text@.
-    , reqCookies    :: ![(Text, Text)]
-    , reqWaiRequest :: !W.Request
-    , reqLangs      :: ![Text]
-      -- ^ Languages which the client supports. This is an ordered list by preference.
-    , reqToken      :: !(Maybe Text)
-      -- ^ A random, session-specific token used to prevent CSRF attacks.
-    , reqSession    :: !SessionMap
-      -- ^ Initial session sent from the client.
-      --
-      -- Since 1.2.0
-    , reqAccept     :: ![ContentType]
-      -- ^ An ordered list of the accepted content types.
-      --
-      -- Since 1.2.0
-    }
 
 -- | An augmented WAI 'W.Response'. This can either be a standard @Response@,
 -- or a higher-level data structure which Yesod will turn into a @Response@.
@@ -413,21 +381,12 @@ instance MonadIO m => MonadIO (WidgetT site m) where
 instance MonadBase b m => MonadBase b (WidgetT site m) where
     liftBase = WidgetT . const . liftBase . fmap (, mempty)
 instance MonadBaseControl b m => MonadBaseControl b (WidgetT site m) where
-#if MIN_VERSION_monad_control(1,0,0)
     type StM (WidgetT site m) a = StM m (a, GWData (Route site))
     liftBaseWith f = WidgetT $ \reader' ->
         liftBaseWith $ \runInBase ->
             liftM (\x -> (x, mempty))
             (f $ runInBase . flip unWidgetT reader')
     restoreM = WidgetT . const . restoreM
-#else
-    data StM (WidgetT site m) a = StW (StM m (a, GWData (Route site)))
-    liftBaseWith f = WidgetT $ \reader' ->
-        liftBaseWith $ \runInBase ->
-            liftM (\x -> (x, mempty))
-            (f $ liftM StW . runInBase . flip unWidgetT reader')
-    restoreM (StW base) = WidgetT $ const $ restoreM base
-#endif
 instance Monad m => MonadReader site (WidgetT site m) where
     ask = WidgetT $ \hd -> return (rheSite $ handlerEnv hd, mempty)
     local f (WidgetT g) = WidgetT $ \hd -> g hd
@@ -465,10 +424,8 @@ instance MonadIO m => MonadLogger (WidgetT site m) where
     monadLoggerLog a b c d = WidgetT $ \hd ->
         liftIO $ fmap (, mempty) $ rheLog (handlerEnv hd) a b c (toLogStr d)
 
-#if MIN_VERSION_monad_logger(0, 3, 10)
 instance MonadIO m => MonadLoggerIO (WidgetT site m) where
     askLoggerIO = WidgetT $ \hd -> return (rheLog (handlerEnv hd), mempty)
-#endif
 
 instance MonadActive m => MonadActive (WidgetT site m) where
     monadActive = lift monadActive
@@ -507,19 +464,11 @@ instance Monad m => MonadReader site (HandlerT site m) where
 -- \"Control.Monad.Trans.Resource.register\': The mutable state is being accessed
 -- after cleanup. Please contact the maintainers.\"
 instance MonadBaseControl b m => MonadBaseControl b (HandlerT site m) where
-#if MIN_VERSION_monad_control(1,0,0)
     type StM (HandlerT site m) a = StM m a
     liftBaseWith f = HandlerT $ \reader' ->
         liftBaseWith $ \runInBase ->
             f $ runInBase . (\(HandlerT r) -> r reader')
     restoreM = HandlerT . const . restoreM
-#else
-    data StM (HandlerT site m) a = StH (StM m a)
-    liftBaseWith f = HandlerT $ \reader' ->
-        liftBaseWith $ \runInBase ->
-            f $ liftM StH . runInBase . (\(HandlerT r) -> r reader')
-    restoreM (StH base) = HandlerT $ const $ restoreM base
-#endif
 
 instance MonadThrow m => MonadThrow (HandlerT site m) where
     throwM = lift . monadThrow
@@ -531,10 +480,8 @@ instance MonadIO m => MonadLogger (HandlerT site m) where
     monadLoggerLog a b c d = HandlerT $ \hd ->
         liftIO $ rheLog (handlerEnv hd) a b c (toLogStr d)
 
-#if MIN_VERSION_monad_logger(0, 3, 10)
 instance MonadIO m => MonadLoggerIO (HandlerT site m) where
     askLoggerIO = HandlerT $ \hd -> return (rheLog (handlerEnv hd))
-#endif
 
 instance Monoid (UniqueList x) where
     mempty = UniqueList id
@@ -558,3 +505,4 @@ data Logger = Logger
 
 loggerPutStr :: Logger -> LogStr -> IO ()
 loggerPutStr (Logger ls _) = pushLogStr ls
+-}
