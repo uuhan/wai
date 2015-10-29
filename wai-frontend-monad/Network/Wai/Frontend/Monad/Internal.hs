@@ -62,7 +62,7 @@ data RichRequest = RichRequest
       --
       -- Since 1.2.0
     -}
-    , reqAccept     :: ![ContentType]
+    , rrAccept     :: [ContentType]
       -- ^ An ordered list of the accepted content types.
       --
       -- Since 1.2.0
@@ -273,26 +273,9 @@ data PageContent url = PageContent
     , pageBody  :: HtmlUrl url
     }
 
-data Content = ContentBuilder !BBuilder.Builder !(Maybe Int) -- ^ The content and optional content length.
-             | ContentSource !(Source (ResourceT IO) (Flush BBuilder.Builder))
-             | ContentFile !FilePath !(Maybe FilePart)
-             | ContentDontEvaluate !Content
-
-data TypedContent = TypedContent !ContentType !Content
-
-type RepHtml = Html
-{-# DEPRECATED RepHtml "Please use Html instead" #-}
 newtype RepJson = RepJson Content
 newtype RepPlain = RepPlain Content
 newtype RepXml = RepXml Content
-
-type ContentType = ByteString -- FIXME Text?
-
--- | Prevents a response body from being fully evaluated before sending the
--- request.
---
--- Since 1.1.0
-newtype DontFullyEvaluate a = DontFullyEvaluate { unDontFullyEvaluate :: a }
 
 -- | Responses to indicate some form of an error occurred.
 data ErrorResponse =
@@ -468,40 +451,6 @@ instance MonadIO m => MonadIO (HandlerT site m) where
     liftIO = lift . liftIO
 instance MonadBase b m => MonadBase b (HandlerT site m) where
     liftBase = lift . liftBase
-instance Monad m => MonadReader site (HandlerT site m) where
-    ask = HandlerT $ return . rheSite . handlerEnv
-    local f (HandlerT g) = HandlerT $ \hd -> g hd
-        { handlerEnv = (handlerEnv hd)
-            { rheSite = f $ rheSite $ handlerEnv hd
-            }
-        }
--- | Note: although we provide a @MonadBaseControl@ instance, @lifted-base@'s
--- @fork@ function is incompatible with the underlying @ResourceT@ system.
--- Instead, if you must fork a separate thread, you should use
--- @resourceForkIO@.
---
--- Using fork usually leads to an exception that says
--- \"Control.Monad.Trans.Resource.register\': The mutable state is being accessed
--- after cleanup. Please contact the maintainers.\"
-instance MonadBaseControl b m => MonadBaseControl b (HandlerT site m) where
-    type StM (HandlerT site m) a = StM m a
-    liftBaseWith f = HandlerT $ \reader' ->
-        liftBaseWith $ \runInBase ->
-            f $ runInBase . (\(HandlerT r) -> r reader')
-    restoreM = HandlerT . const . restoreM
-
-instance MonadThrow m => MonadThrow (HandlerT site m) where
-    throwM = lift . monadThrow
-
-instance (MonadIO m, MonadBase IO m, MonadThrow m) => MonadResource (HandlerT site m) where
-    liftResourceT f = HandlerT $ \hd -> liftIO $ runInternalState f (handlerResource hd)
-
-instance MonadIO m => MonadLogger (HandlerT site m) where
-    monadLoggerLog a b c d = HandlerT $ \hd ->
-        liftIO $ rheLog (handlerEnv hd) a b c (toLogStr d)
-
-instance MonadIO m => MonadLoggerIO (HandlerT site m) where
-    askLoggerIO = HandlerT $ \hd -> return (rheLog (handlerEnv hd))
 
 instance Monoid (UniqueList x) where
     mempty = UniqueList id

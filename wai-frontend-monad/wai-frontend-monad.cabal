@@ -26,8 +26,19 @@ library
                    , transformers          >= 0.2.2
                    , mtl
                    , case-insensitive
+                   , resourcet
+                   , monad-logger
+                   , transformers-base
+                   , exceptions
+                   , monad-control
+                   , word8
+                   , aeson
+                   , blaze-html
 
-    exposed-modules: Network.Wai.Frontend.Monad.Functions
+    exposed-modules: Network.Wai.Frontend.Monad.Content
+                     Network.Wai.Frontend.Monad.Conversion
+                     Network.Wai.Frontend.Monad.Functions
+                     Network.Wai.Frontend.Monad.Handler
                      Network.Wai.Frontend.Monad.Internal
     other-modules:   Paths_wai_frontend_monad
 

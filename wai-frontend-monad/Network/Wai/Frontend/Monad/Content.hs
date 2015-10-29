@@ -5,12 +5,12 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE CPP #-}
-module Yesod.Core.Content
+module Network.Wai.Frontend.Monad.Content
     ( -- * Content
       Content (..)
     , emptyContent
     , ToContent (..)
-    , ToFlushBuilder (..)
+    --, ToFlushBuilder (..) FIXME
       -- * Mime types
       -- ** Data type
     , ContentType
@@ -38,15 +38,6 @@ module Yesod.Core.Content
     , TypedContent (..)
     , ToTypedContent (..)
     , HasContentType (..)
-      -- ** Specific content types
-    , RepHtml
-    , RepJson (..)
-    , RepPlain (..)
-    , RepXml (..)
-      -- ** Smart constructors
-    , repJson
-    , repPlain
-    , repXml
     ) where
 
 import qualified Data.ByteString as B
@@ -55,29 +46,19 @@ import Data.Text.Lazy (Text, pack)
 import qualified Data.Text as T
 import Control.Monad (liftM)
 
-import Blaze.ByteString.Builder (Builder, fromByteString, fromLazyByteString)
-#if __GLASGOW_HASKELL__ < 710
-import Data.Monoid (mempty)
-#endif
-import Text.Hamlet (Html)
+import Data.ByteString.Lazy.Builder (Builder, byteString, lazyByteString, stringUtf8)
+import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Lazy.Encoding as TLE
+import Data.Monoid
 import Text.Blaze.Html.Renderer.Utf8 (renderHtmlBuilder)
-import Data.Conduit (Source, Flush (Chunk), ResumableSource, mapOutput)
 import Control.Monad.Trans.Resource (ResourceT)
-import Data.Conduit.Internal (ResumableSource (ResumableSource))
-import qualified Data.Conduit.Internal as CI
 
 import qualified Data.Aeson as J
-#if MIN_VERSION_aeson(0, 7, 0)
-import Data.Aeson.Encode (encodeToTextBuilder)
-#else
-import Data.Aeson.Encode (fromValue)
-#endif
-import qualified Blaze.ByteString.Builder.Char.Utf8 as Blaze
+import Data.Aeson.Encode (encodeToByteStringBuilder)
 import Data.Text.Lazy.Builder (toLazyText)
-import Yesod.Core.Types
-import Text.Lucius (Css, renderCss)
-import Text.Julius (Javascript, unJavascript)
 import Data.Word8 (_semicolon, _slash)
+import Network.Wai (FilePart)
+import Text.Blaze.Html (Html)
 
 -- | Zero-length enumerator.
 emptyContent :: Content
@@ -99,15 +80,15 @@ instance ToContent Content where
 instance ToContent Builder where
     toContent = flip ContentBuilder Nothing
 instance ToContent B.ByteString where
-    toContent bs = ContentBuilder (fromByteString bs) $ Just $ B.length bs
+    toContent bs = ContentBuilder (byteString bs) $ Just $ B.length bs
 instance ToContent L.ByteString where
-    toContent = flip ContentBuilder Nothing . fromLazyByteString
+    toContent = flip ContentBuilder Nothing . lazyByteString
 instance ToContent T.Text where
-    toContent = toContent . Blaze.fromText
+    toContent = toContent . TE.encodeUtf8Builder
 instance ToContent Text where
-    toContent = toContent . Blaze.fromLazyText
+    toContent = toContent . TLE.encodeUtf8Builder
 instance ToContent String where
-    toContent = toContent . Blaze.fromString
+    toContent = toContent . stringUtf8
 instance ToContent Html where
     toContent bs = ContentBuilder (renderHtmlBuilder bs) Nothing
 instance ToContent () where
@@ -117,14 +98,7 @@ instance ToContent (ContentType, Content) where
 instance ToContent TypedContent where
     toContent (TypedContent _ c) = c
 
-instance ToContent Css where
-    toContent = toContent . renderCss
-instance ToContent Javascript where
-    toContent = toContent . toLazyText . unJavascript
-
-instance ToFlushBuilder builder => ToContent (CI.Pipe () () builder () (ResourceT IO) ()) where
-    toContent src = ContentSource $ CI.ConduitM (CI.mapOutput toFlushBuilder src >>=)
-
+{- FIXME
 instance ToFlushBuilder builder => ToContent (Source (ResourceT IO) builder) where
     toContent src = ContentSource $ mapOutput toFlushBuilder src
 instance ToFlushBuilder builder => ToContent (ResumableSource (ResourceT IO) builder) where
@@ -137,10 +111,10 @@ instance ToFlushBuilder builder => ToContent (ResumableSource (ResourceT IO) bui
 class ToFlushBuilder a where toFlushBuilder :: a -> Flush Builder
 instance ToFlushBuilder (Flush Builder) where toFlushBuilder = id
 instance ToFlushBuilder Builder where toFlushBuilder = Chunk
-instance ToFlushBuilder (Flush B.ByteString) where toFlushBuilder = fmap fromByteString
-instance ToFlushBuilder B.ByteString where toFlushBuilder = Chunk . fromByteString
-instance ToFlushBuilder (Flush L.ByteString) where toFlushBuilder = fmap fromLazyByteString
-instance ToFlushBuilder L.ByteString where toFlushBuilder = Chunk . fromLazyByteString
+instance ToFlushBuilder (Flush B.ByteString) where toFlushBuilder = fmap byteString
+instance ToFlushBuilder B.ByteString where toFlushBuilder = Chunk . byteString
+instance ToFlushBuilder (Flush L.ByteString) where toFlushBuilder = fmap lazyByteString
+instance ToFlushBuilder L.ByteString where toFlushBuilder = Chunk . lazyByteString
 instance ToFlushBuilder (Flush Text) where toFlushBuilder = fmap Blaze.fromLazyText
 instance ToFlushBuilder Text where toFlushBuilder = Chunk . Blaze.fromLazyText
 instance ToFlushBuilder (Flush T.Text) where toFlushBuilder = fmap Blaze.fromText
@@ -149,31 +123,10 @@ instance ToFlushBuilder (Flush String) where toFlushBuilder = fmap Blaze.fromStr
 instance ToFlushBuilder String where toFlushBuilder = Chunk . Blaze.fromString
 instance ToFlushBuilder (Flush Html) where toFlushBuilder = fmap renderHtmlBuilder
 instance ToFlushBuilder Html where toFlushBuilder = Chunk . renderHtmlBuilder
-
-repJson :: ToContent a => a -> RepJson
-repJson = RepJson . toContent
-
-repPlain :: ToContent a => a -> RepPlain
-repPlain = RepPlain . toContent
-
-repXml :: ToContent a => a -> RepXml
-repXml = RepXml . toContent
+-}
 
 class ToTypedContent a => HasContentType a where
     getContentType :: Monad m => m a -> ContentType
-
-instance HasContentType RepJson where
-    getContentType _ = typeJson
-deriving instance ToContent RepJson
-
-instance HasContentType RepPlain where
-    getContentType _ = typePlain
-deriving instance ToContent RepPlain
-
-instance HasContentType RepXml where
-    getContentType _ = typeXml
-deriving instance ToContent RepXml
-
 
 typeHtml :: ContentType
 typeHtml = "text/html; charset=utf-8"
@@ -243,14 +196,7 @@ instance ToContent a => ToContent (DontFullyEvaluate a) where
     toContent (DontFullyEvaluate a) = ContentDontEvaluate $ toContent a
 
 instance ToContent J.Value where
-    toContent = flip ContentBuilder Nothing
-              . Blaze.fromLazyText
-              . toLazyText
-#if MIN_VERSION_aeson(0, 7, 0)
-              . encodeToTextBuilder
-#else
-              . fromValue
-#endif
+    toContent = flip ContentBuilder Nothing . encodeToByteStringBuilder
 instance HasContentType J.Value where
     getContentType _ = typeJson
 
@@ -262,12 +208,6 @@ instance HasContentType Text where
 
 instance HasContentType T.Text where
     getContentType _ = typePlain
-
-instance HasContentType Css where
-    getContentType _ = typeCss
-
-instance HasContentType Javascript where
-    getContentType _ = typeJavascript
 
 -- | Any type which can be converted to 'TypedContent'.
 --
@@ -281,16 +221,10 @@ instance ToTypedContent () where
     toTypedContent () = TypedContent typePlain (toContent ())
 instance ToTypedContent (ContentType, Content) where
     toTypedContent (ct, content) = TypedContent ct content
-instance ToTypedContent RepJson where
-    toTypedContent (RepJson c) = TypedContent typeJson c
-instance ToTypedContent RepPlain where
-    toTypedContent (RepPlain c) = TypedContent typePlain c
-instance ToTypedContent RepXml where
-    toTypedContent (RepXml c) = TypedContent typeXml c
-instance ToTypedContent J.Value where
-    toTypedContent v = TypedContent typeJson (toContent v)
 instance ToTypedContent Html where
     toTypedContent h = TypedContent typeHtml (toContent h)
+instance ToTypedContent J.Value where
+    toTypedContent v = TypedContent typeJson (toContent v)
 instance ToTypedContent T.Text where
     toTypedContent t = TypedContent typePlain (toContent t)
 instance ToTypedContent [Char] where
@@ -302,7 +236,17 @@ instance ToTypedContent a => ToTypedContent (DontFullyEvaluate a) where
         let TypedContent ct c = toTypedContent a
          in TypedContent ct (ContentDontEvaluate c)
 
-instance ToTypedContent Css where
-    toTypedContent = TypedContent typeCss . toContent
-instance ToTypedContent Javascript where
-    toTypedContent = TypedContent typeJavascript . toContent
+data Content = ContentBuilder !Builder !(Maybe Int) -- ^ The content and optional content length.
+             | ContentStream !((Builder -> IO ()) -> IO () -> IO ())
+             | ContentFile !FilePath !(Maybe FilePart)
+             | ContentDontEvaluate !Content
+
+data TypedContent = TypedContent !ContentType !Content
+
+type ContentType = B.ByteString -- FIXME Text?
+
+-- | Prevents a response body from being fully evaluated before sending the
+-- request.
+--
+-- Since 1.1.0
+newtype DontFullyEvaluate a = DontFullyEvaluate { unDontFullyEvaluate :: a }
