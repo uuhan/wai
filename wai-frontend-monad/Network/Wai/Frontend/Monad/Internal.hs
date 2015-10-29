@@ -1,9 +1,29 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RankNTypes #-}
 module Network.Wai.Frontend.Monad.Internal where
 
-import Lens.Family2
-import Lens.Family2.TH
 import Network.Wai
+import Data.Text (Text)
+import Data.ByteString (ByteString)
+import Data.Functor.Constant
+import Data.Functor.Identity
+import Control.Monad.Reader
+
+type Lens s t a b = forall f. Functor f => (a -> f b) -> s -> f t
+type Lens' s a = Lens s s a a
+
+lens :: (s -> a) -> (s -> b -> t) -> Lens s t a b
+lens getter setter f s = fmap (setter s) (f (getter s))
+
+view :: Lens s t a b -> s -> a
+view l s = getConstant (l Constant s)
+
+set :: Lens s t a b -> b -> s -> t
+set l b s = runIdentity (l (const (Identity b)) s)
+
+over :: Lens s t a b -> (a -> b) -> s -> t
+over l f s = runIdentity (l (Identity . f) s)
+
+type ContentType = ByteString
 
 -- |
 --
@@ -30,7 +50,7 @@ data RichRequest = RichRequest
     -- ^
     --
     -- @since 0.1.0.0
-    , reqLangs      :: [Text]
+    , rrLangs      :: [Text]
     -- ^
     --
     -- @since 0.1.0.0

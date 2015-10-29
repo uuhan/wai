@@ -17,6 +17,7 @@ extra-source-files:
 
 library
     build-depends:   base                  >= 4.3      && < 5
+                   , http-types
                    , time                  >= 1.1.4
                    , wai                   >= 3.0
                    , wai-extra             >= 3.0.7
@@ -24,9 +25,10 @@ library
                    , text                  >= 0.7
                    , transformers          >= 0.2.2
                    , mtl
-                   , lens-family
+                   , case-insensitive
 
-    exposed-modules: Network.Wai.Frontend.Monad.Internal
+    exposed-modules: Network.Wai.Frontend.Monad.Functions
+                     Network.Wai.Frontend.Monad.Internal
     other-modules:   Paths_wai_frontend_monad
 
     ghc-options:     -Wall
