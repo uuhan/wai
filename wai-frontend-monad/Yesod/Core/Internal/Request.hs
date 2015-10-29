@@ -187,6 +187,3 @@ mkFileInfoSource name ct src = FileInfo name ct src (\dst -> runResourceT $ src 
 
 tokenKey :: IsString a => a
 tokenKey = "_TOKEN"
-
-langKey :: IsString a => a
-langKey = "_LANG"

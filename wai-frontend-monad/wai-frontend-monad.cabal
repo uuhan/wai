@@ -34,6 +34,9 @@ library
                    , word8
                    , aeson
                    , blaze-html
+                   , containers
+                   , cereal
+                   , cookie
 
     exposed-modules: Network.Wai.Frontend.Monad.Content
                      Network.Wai.Frontend.Monad.Conversion
@@ -41,6 +44,7 @@ library
                      Network.Wai.Frontend.Monad.Handler
                      Network.Wai.Frontend.Monad.Internal
     other-modules:   Paths_wai_frontend_monad
+                     Network.Wai.Frontend.Monad.Util
 
     ghc-options:     -Wall
 

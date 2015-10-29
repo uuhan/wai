@@ -20,6 +20,7 @@ import Control.Monad.Reader
 import Control.Monad.Catch
 import Control.Monad.Trans.Resource
 import Control.Monad.Trans.Control
+import Data.IORef
 
 type LogFunc = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 
@@ -28,7 +29,15 @@ data HandlerEnv site = HandlerEnv
     , heSite :: site
     , heInternalState :: InternalState
     , heSettings :: HandlerSettings
+    , heResponseStateRef :: IORef ResponseState
     }
+
+instance HasWaiRequest (HandlerEnv site) where
+    waiRequest = richRequest . waiRequest
+instance HasRichRequest (HandlerEnv site) where
+    richRequest = lens heRichRequest (\he rr -> he { heRichRequest = rr })
+instance HasResponseStateRef (HandlerEnv site) where
+    responseStateRef = lens heResponseStateRef (\he ref -> he { heResponseStateRef = ref })
 
 data HandlerSettings = HandlerSettings
     { hsLogFunc :: LogFunc
@@ -51,12 +60,17 @@ handlerToApp :: ToTypedContent a
              -> HandlerSettings
              -> HandlerT site IO a
              -> Application
-handlerToApp site logFunc (HandlerT f) req respond = bracket
+handlerToApp site settings (HandlerT f) req respond = bracket
     createInternalState
     closeInternalState
     $ \internalState -> do
+        ref <- newIORef initialResponseState
         let he = HandlerEnv
                 { heRichRequest = toRichRequest req
+                , heInternalState = internalState
+                , heSettings = settings
+                , heSite = site
+                , heResponseStateRef = ref
                 }
         res <- f he
         error "FIXME"

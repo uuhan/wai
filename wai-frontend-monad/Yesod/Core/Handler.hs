@@ -197,8 +197,6 @@ import qualified Network.Wai                   as W
 import Control.Monad.Trans.Class (lift)
 
 import qualified Data.Text                     as T
-import qualified Data.Text.Lazy                as TL
-import qualified Text.Blaze.Html.Renderer.Text as RenderText
 import           Text.Hamlet                   (Html, HtmlUrl, hamlet)
 
 import qualified Data.ByteString               as S
@@ -506,15 +504,6 @@ redirectUltDest defaultDestination = do
 clearUltDest :: MonadHandler m => m ()
 clearUltDest = deleteSession ultDestKey
 
-msgKey :: Text
-msgKey = "_MSG"
-
--- | Sets a message in the user's session.
---
--- See 'getMessage'.
-setMessage :: MonadHandler m => Html -> m ()
-setMessage = setSession msgKey . T.concat . TL.toChunks . RenderText.renderHtml
-
 -- | Sets a message in the user's session.
 --
 -- See 'getMessage'.
@@ -665,139 +654,6 @@ invalidArgsI :: (MonadHandler m, RenderMessage (HandlerSite m) msg) => [msg] -> 
 invalidArgsI msg = do
     mr <- getMessageRender
     invalidArgs $ map mr msg
-
-------- Headers
--- | Set the cookie on the client.
-
-setCookie :: MonadHandler m => SetCookie -> m ()
-setCookie = addHeaderInternal . AddCookie
-
--- | Helper function for setCookieExpires value
-getExpires :: MonadIO m
-           => Int -- ^ minutes
-           -> m UTCTime
-getExpires m = do
-    now <- liftIO getCurrentTime
-    return $ fromIntegral (m * 60) `addUTCTime` now
-
-
--- | Unset the cookie on the client.
---
--- Note: although the value used for key and path is 'Text', you should only
--- use ASCII values to be HTTP compliant.
-deleteCookie :: MonadHandler m
-             => Text -- ^ key
-             -> Text -- ^ path
-             -> m ()
-deleteCookie a = addHeaderInternal . DeleteCookie (encodeUtf8 a) . encodeUtf8
-
-
--- | Set the language in the user session. Will show up in 'languages' on the
--- next request.
-setLanguage :: MonadHandler m => Text -> m ()
-setLanguage = setSession langKey
-
--- | Set an arbitrary response header.
---
--- Note that, while the data type used here is 'Text', you must provide only
--- ASCII value to be HTTP compliant.
---
--- Since 1.2.0
-addHeader :: MonadHandler m => Text -> Text -> m ()
-addHeader a = addHeaderInternal . Header (encodeUtf8 a) . encodeUtf8
-
--- | Set the Cache-Control header to indicate this response should be cached
--- for the given number of seconds.
-cacheSeconds :: MonadHandler m => Int -> m ()
-cacheSeconds i = setHeader "Cache-Control" $ T.concat
-    [ "max-age="
-    , T.pack $ show i
-    , ", public"
-    ]
-
--- | Set the Expires header to some date in 2037. In other words, this content
--- is never (realistically) expired.
-neverExpires :: MonadHandler m => m ()
-neverExpires = do
-    setHeader "Expires" . rheMaxExpires =<< askHandlerEnv
-    cacheSeconds oneYear
-  where
-    oneYear :: Int
-    oneYear = 60 * 60 * 24 * 365
-
--- | Set an Expires header in the past, meaning this content should not be
--- cached.
-alreadyExpired :: MonadHandler m => m ()
-alreadyExpired = setHeader "Expires" "Thu, 01 Jan 1970 05:05:05 GMT"
-
--- | Set an Expires header to the given date.
-expiresAt :: MonadHandler m => UTCTime -> m ()
-expiresAt = setHeader "Expires" . formatRFC1123
-
--- | Check the if-none-match header and, if it matches the given value, return
--- a 304 not modified response. Otherwise, set the etag header to the given
--- value.
---
--- Note that it is the responsibility of the caller to ensure that the provided
--- value is a value etag value, no sanity checking is performed by this
--- function.
---
--- Since 1.4.4
-setEtag :: MonadHandler m => Text -> m ()
-setEtag etag = do
-    mmatch <- lookupHeader "if-none-match"
-    let matches = maybe [] parseMatch mmatch
-    if encodeUtf8 etag `elem` matches
-        then notModified
-        else addHeader "etag" $ T.concat ["\"", etag, "\""]
-
--- | Parse an if-none-match field according to the spec. Does not parsing on
--- weak matches, which are not supported by setEtag.
-parseMatch :: S.ByteString -> [S.ByteString]
-parseMatch =
-    map clean . S.split W8._comma
-  where
-    clean = stripQuotes . fst . S.spanEnd W8.isSpace . S.dropWhile W8.isSpace
-
-    stripQuotes bs
-        | S.length bs >= 2 && S.head bs == W8._quotedbl && S.last bs == W8._quotedbl
-            = S.init $ S.tail bs
-        | otherwise = bs
-
--- | Set a variable in the user's session.
---
--- The session is handled by the clientsession package: it sets an encrypted
--- and hashed cookie on the client. This ensures that all data is secure and
--- not tampered with.
-setSession :: MonadHandler m
-           => Text -- ^ key
-           -> Text -- ^ value
-           -> m ()
-setSession k = setSessionBS k . encodeUtf8
-
--- | Same as 'setSession', but uses binary data for the value.
-setSessionBS :: MonadHandler m
-             => Text
-             -> S.ByteString
-             -> m ()
-setSessionBS k = modify . modSession . Map.insert k
-
--- | Unsets a session variable. See 'setSession'.
-deleteSession :: MonadHandler m => Text -> m ()
-deleteSession = modify . modSession . Map.delete
-
--- | Clear all session variables.
---
--- Since: 1.0.1
-clearSession :: MonadHandler m => m ()
-clearSession = modify $ \x -> x { ghsSession = Map.empty }
-
-modSession :: (SessionMap -> SessionMap) -> GHState -> GHState
-modSession f x = x { ghsSession = f $ ghsSession x }
-
--- | Internal use only, not to be confused with 'setHeader'.
-addHeaderInternal :: MonadHandler m => Header -> m ()
-addHeaderInternal = tell . Endo . (:)
 
 -- | Some value which can be turned into a URL for redirects.
 class RedirectUrl master a where

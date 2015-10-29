@@ -7,6 +7,11 @@ import Data.ByteString (ByteString)
 import Data.Functor.Constant
 import Data.Functor.Identity
 import Control.Monad.Reader
+import Network.HTTP.Types ()
+import Data.Map (Map)
+import Data.IORef
+import Web.Cookie
+import Data.String
 
 type Lens s t a b = forall f. Functor f => (a -> f b) -> s -> f t
 type Lens' s a = Lens s s a a
@@ -74,9 +79,48 @@ instance HasWaiRequest RichRequest where
 instance HasRichRequest RichRequest where
     richRequest = id
 
-{-
 -- Sessions
 type SessionMap = Map Text ByteString
+
+data ResponseState = ResponseState
+    { rsSession :: SessionMap
+    --, rsRBC     :: Maybe RequestBodyContents
+    --, rsIdent   :: Int
+    --, rsCache   :: TypeMap
+    --, rsCacheBy :: KeyedTypeMap
+    , rsHeaders :: [Header] -> [Header]
+    }
+
+----- header stuff
+-- | Headers to be added to a 'Result'.
+data Header =
+    AddCookie SetCookie
+    | DeleteCookie ByteString ByteString
+    | Header ByteString ByteString
+    deriving (Eq, Show)
+
+class HasResponseStateRef a where
+    responseStateRef :: Lens' a (IORef ResponseState)
+
+initialResponseState :: ResponseState
+initialResponseState = ResponseState
+    { rsSession = mempty
+    , rsHeaders = id
+    }
+
+getResponseState :: (MonadIO m, MonadReader env m, HasResponseStateRef env) => m ResponseState
+getResponseState = asks (view responseStateRef) >>= liftIO . readIORef
+
+putResponseState :: (MonadIO m, MonadReader env m, HasResponseStateRef env) => ResponseState -> m ()
+putResponseState s = asks (view responseStateRef) >>= liftIO . flip writeIORef s
+
+modifyResponseState :: (MonadIO m, MonadReader env m, HasResponseStateRef env) => (ResponseState -> ResponseState) -> m ()
+modifyResponseState f = asks (view responseStateRef) >>= liftIO . flip modifyIORef f
+
+langKey :: IsString a => a
+langKey = fromString "_LANG"
+
+{-
 
 type SaveSession = SessionMap -- ^ The session contents after running the handler
                 -> IO [Header]
@@ -216,15 +260,6 @@ type family MonadRoute (m :: * -> *)
 type instance MonadRoute IO = ()
 type instance MonadRoute (HandlerT site m) = (Route site)
 
-data GHState = GHState
-    { ghsSession :: SessionMap
-    , ghsRBC     :: Maybe RequestBodyContents
-    , ghsIdent   :: Int
-    , ghsCache   :: TypeMap
-    , ghsCacheBy :: KeyedTypeMap
-    , ghsHeaders :: Endo [Header]
-    }
-
 -- | An extension of the basic WAI 'W.Application' datatype to provide extra
 -- features needed by Yesod. Users should never need to use this directly, as
 -- the 'HandlerT' monad and template haskell code should hide it away.
@@ -286,14 +321,6 @@ data ErrorResponse =
     | PermissionDenied Text
     | BadMethod H.Method
     deriving (Show, Eq, Typeable)
-
------ header stuff
--- | Headers to be added to a 'Result'.
-data Header =
-    AddCookie SetCookie
-    | DeleteCookie ByteString ByteString
-    | Header ByteString ByteString
-    deriving (Eq, Show)
 
 -- FIXME In the next major version bump, let's just add strictness annotations
 -- to Header (and probably everywhere else). We can also add strictness

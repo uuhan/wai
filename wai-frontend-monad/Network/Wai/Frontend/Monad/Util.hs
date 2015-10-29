@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-module Yesod.Core.Internal.Util
+module Network.Wai.Frontend.Monad.Util
     ( putTime
     , getTime
     , formatW3
