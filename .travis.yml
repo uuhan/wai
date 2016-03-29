@@ -121,8 +121,12 @@ before_install:
   cat > $HOME/.cabal/config <<EOF
   remote-repo: hackage.haskell.org:http://hackage.fpcomplete.com/
   remote-repo-cache: $HOME/.cabal/packages
-  jobs: \$ncpus
   EOF
+
+  if [ "$CABALVER" != "1.16" ]
+  then
+    echo 'jobs: $ncpus' >> $HOME/.cabal/config
+  fi
 
 # Get the list of packages from the stack.yaml file
 - PACKAGES=$(stack --install-ghc query locals | grep '^ *path' | sed 's@^ *path:@@')
