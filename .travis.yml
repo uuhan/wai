@@ -145,6 +145,7 @@ install:
       # we can't build just dependencies
       #
       # cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS $PACKAGES
+      cabal install hspec-discover
       ;;
   esac
 
