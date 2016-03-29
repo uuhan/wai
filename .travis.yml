@@ -150,6 +150,7 @@ install:
 
 script:
 - |
+  set -ex
   case "$BUILD" in
     stack)
       stack --no-terminal $ARGS test --haddock --no-haddock-deps
@@ -169,3 +170,4 @@ script:
       done
       ;;
   esac
+  set +ex
